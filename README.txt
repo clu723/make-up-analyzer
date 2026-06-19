@@ -1,0 +1,198 @@
+MAKEUP SESSION ANALYZER
+========================
+
+WHAT'S IN THIS FOLDER
+----------------------
+  analyzer_core.py            — shared logic (required for build)
+  makeup_analyzer_app.py      — the program (source code, required for build)
+  build_windows.bat           — builds MakeupAnalyzer.exe  (run this on Windows)
+  build_mac.sh                — builds MakeupAnalyzer app  (run this on Mac)
+  README.txt                  — this file
+
+
+FOR THE PERSON SETTING THIS UP (one-time only)
+-----------------------------------------------
+You only need to do this ONCE on any computer that will build the .exe.
+After that, the .exe can be copied to any Windows computer and just works —
+no Python, no setup, nothing needed on the target computer.
+
+Step 1 — Install Python (if not already installed)
+  • Go to https://www.python.org/downloads/
+  • Download the latest Python 3 installer
+  • During installation, CHECK THE BOX that says "Add Python to PATH"
+
+Step 2 — Build the executable
+  Windows:  Double-click  build_windows.bat  and follow the prompts.
+  Mac:      Open Terminal, drag build_mac.sh into it, press Enter.
+
+Step 3 — Find your executable
+  Windows:  Look in the  dist\  folder → MakeupAnalyzer.exe
+  Mac:      Look in the  dist/  folder → MakeupAnalyzer
+
+Step 4 — Distribute
+  Copy MakeupAnalyzer.exe (or MakeupAnalyzer on Mac) to any shared drive
+  or desktop. That single file is all your coworkers need.
+
+  NOTE: If you ever rebuild after changes, delete the old  dist\  and
+  build\  folders first before running the build script again.
+
+
+FOR COWORKERS USING THE PROGRAM
+---------------------------------
+Just double-click MakeupAnalyzer.exe (Windows) or MakeupAnalyzer (Mac).
+
+The window has three file pickers:
+
+  1. Attendance sheet (.xlsx)
+     Your normal monthly attendance export. Required.
+
+  2. Configuration workbook (.xlsx)   <- OPTIONAL
+     A single workbook that can contain any of these tabs (tab names are
+     detected automatically — exact name does not matter):
+
+     a) Reduced-Hour Students tab
+        Lists students who only need 4 hours/month instead of the
+        standard 8. Two formats are accepted:
+
+          Format A (two columns):        Format B (one column):
+          +------------+-----------+     +------------------+
+          | First Name | Last Name |     | Full Name        |
+          +------------+-----------+     +------------------+
+          | Jane       | Doe       |     | Jane Doe         |
+          | John       | Smith     |     | John Smith       |
+          +------------+-----------+     +------------------+
+
+        Leave this out if all students use the standard 8-hour requirement.
+
+     b) Schedule Changes tab   <- OPTIONAL
+        Records students who permanently switched session days partway
+        through a month. The tool uses the old schedule before the
+        effective date and the new schedule on and after it.
+
+        Required columns (names must match exactly, spelling and spacing):
+
+          +------------+-----------+----------------+------------------+
+          | First Name | Last Name | Effective Date | New Session Days |
+          +------------+-----------+----------------+------------------+
+          | Jane       | Doe       | 2026-04-15     | Mon, Wed         |
+          | John       | Smith     | 2026-03-10     | Tue, Thu         |
+          +------------+-----------+----------------+------------------+
+
+          OR if you prefer a single name column:
+
+          +------------+----------------+------------------+
+          | Full Name  | Effective Date | New Session Days |
+          +------------+----------------+------------------+
+          | Jane Doe   | 2026-04-15     | Mon, Wed         |
+          | John Smith | 2026-03-10     | Tue, Thu         |
+          +------------+----------------+------------------+
+
+        EFFECTIVE DATE — the first day the new schedule applies.
+          Any date format Excel recognises works (2026-04-15, 4/15/2026, etc.)
+
+        NEW SESSION DAYS — the days of the week after the change.
+          Separate multiple days with a comma. Accepted abbreviations:
+
+            Mon  Tue  Wed  Thu  Fri  Sat
+            Mo   Tu   We   Th   Fr
+            Monday  Tuesday  Wednesday  Thursday  Friday  Saturday
+
+          NOTE: Sunday is NOT accepted. Session days run Mon–Sat only.
+
+          Examples:  "Mon, Wed"   "Tue, Thu"   "Friday"
+
+        Leave this out if no students changed their schedule this month.
+
+     c) On-Hold Students tab   <- OPTIONAL
+        Records students who are temporarily on hold (e.g. sick leave,
+        vacation, suspension). During a hold, the student's required
+        hours are prorated — only scheduled sessions outside the hold
+        period count toward the monthly minimum.
+
+        End date is the FIRST DAY the student is back (exclusive).
+        Example: hold from April 15 to May 10 means the student is on
+        hold April 15 through May 9, and back on May 10.
+
+        If a student is currently on hold (hold overlaps the current
+        month), any past-month shortfalls are shown with status "On Hold"
+        — they still owe the hours but cannot act on them until the hold
+        is lifted.
+
+        Columns:
+
+          +------------+-----------+----------------+-------------+
+          | First Name | Last Name | Hold Start     | Hold End    |
+          +------------+-----------+----------------+-------------+
+          | Jane       | Doe       | 2026-04-15     | 2026-05-10  |
+          +------------+-----------+----------------+-------------+
+
+          OR single name column:
+
+          +------------+----------------+-------------+
+          | Full Name  | Hold Start     | Hold End    |
+          +------------+----------------+-------------+
+          | Jane Doe   | 2026-04-15     | 2026-05-10  |
+          +------------+----------------+-------------+
+
+        HOLD START — the first day the hold begins (inclusive).
+        HOLD END   — the first day the student returns (exclusive).
+                     Leave blank for indefinite hold.
+
+     d) New Students tab   <- OPTIONAL
+        Records students who recently started and have a start date.
+        They do not owe makeup hours for sessions that occurred before
+        their start date. Months entirely before the start date are
+        skipped; in the month containing the start date, only sessions
+        from the start date onward are counted.
+
+        Columns:
+
+          +------------+-----------+----------------+
+          | First Name | Last Name | Start Date     |
+          +------------+-----------+----------------+
+          | Jane       | Doe       | 2026-05-15     |
+          +------------+-----------+----------------+
+
+          OR single name column:
+
+          +------------+----------------+
+          | Full Name  | Start Date     |
+          +------------+----------------+
+          | Jane Doe   | 2026-05-15     |
+          +------------+----------------+
+
+Then click Run Analysis.
+
+Results appear in the table:
+  • Red rows    = student still needs a makeup session
+  • Yellow rows = student is one missed session away from needing a makeup
+  • Blue rows   = student is on hold
+  • Green rows  = shortfall has been fully made up
+  • Click any row to see full details at the bottom of the window
+
+Click Export to Excel to save a report containing only rows where students
+need action or are on hold. The exported Excel includes these columns:
+  Student, Schedule, Month, Status, On Hold, Hold Start, Hold End,
+  Makeups completed (hrs), Makeups completed (dates), Still needed (hrs),
+  Missed regular sessions
+
+
+HOURS RULES (for reference)
+-----------------------------
+  • Students need 8 hours/month minimum (or 4 hrs for reduced-hours students)
+  • Only sessions on their regular scheduled days count toward the monthly total
+  • Attendance on a non-scheduled day = a makeup session for that month
+  • A makeup session only counts toward the month it was attended, not a
+    different month's shortfall
+  • Grace period: exactly 2 calendar months from the missed session date.
+    Example: missed March 12 → deadline is May 12.
+  • Today's session is never counted as missed (attendance is taken
+    end-of-day, so it has not happened yet when the tool is run)
+  • If a student's projected hours for the rest of the month still can't
+    reach the minimum even with perfect attendance, they are flagged
+    as at risk
+  • Students on hold have their required hours prorated — only scheduled
+    sessions outside the hold period count toward the minimum
+  • New students do not owe makeup hours for sessions before their start
+    date. In their start month, sessions before the start date are
+    deducted from their total required hours for that month
