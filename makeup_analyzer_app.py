@@ -22,7 +22,7 @@ Additional Configuration Workbook format:
     • On hold (optional)
 
   Example hold row:
-    Jane | Doe | 2026-04-15 | 2026-05-31
+    Jane | Doe | 4/15/2026 | 5/31/2026
 """
 
 import sys
@@ -50,7 +50,7 @@ import analyzer_core as core
 from analyzer_core import (
     DAY_FULL,
     load_reduced_students, load_schedule_changes, load_attendance,
-    load_hold_students, load_new_students,
+    load_hold_students, load_new_students, load_dropped_students,
     infer_schedule, analyze, export_excel,
 )
 
@@ -80,21 +80,22 @@ class TieResolverDialog(Toplevel):
               font=("Helvetica", 12, "bold")).pack(**pad)
 
         if pick_count == 1:
-            msg = ("The days below were attended an equal number of times.\n"
+            msg = ("The attendance history is ambiguous.\n"
                    "Select the 1 day that is their regular session day:")
         else:
-            msg = ("The days below were attended an equal number of times.\n"
+            msg = ("The attendance history is ambiguous.\n"
                    "Select exactly 2 that are their regular schedule days:")
         Label(self, text=msg, wraplength=340, justify="left",
               font=("Helvetica", 10)).pack(**pad, pady=(10, 6))
 
         box = Frame(self, relief="groove", bd=1)
         box.pack(**pad, pady=(0, 8), fill=X)
-        for wday in sorted(all_days):
+        # Show all 6 weekdays (Mon–Sat) so the user can pick any combination,
+        # not just the days that happened to tie in attendance.
+        for wday in range(6):
             var   = BooleanVar(value=(wday in fixed_days))
-            state = DISABLED if wday in fixed_days else NORMAL
             Checkbutton(box, text=f"  {DAY_FULL[wday]}", variable=var,
-                        font=("Helvetica", 11), state=state,
+                        font=("Helvetica", 11),
                         command=self._update).pack(anchor=W, padx=8, pady=2)
             self._vars[wday] = var
 
@@ -246,7 +247,7 @@ class App(Tk):
                        self.config_path, self._pick_config, row=1)
         Label(picker,
               text=("Configuration workbook is optional. "
-                    "Expected tabs: Reduced-Hour Students, Schedule Changes, On-Hold Students."),
+                    "Expected tabs: Reduced-Hour Students, Schedule Changes, On-Hold Students, Dropped Students, New Students."),
               bg="#f0f0f0", fg="#777", font=("Helvetica", 9)).grid(
               row=2, column=1, sticky=W, pady=(0, 4))
 
@@ -388,6 +389,12 @@ class App(Tk):
                     preferred_terms=("new student", "new students", "new"),
                     default={},
                 )
+                dropped_students = self._load_optional_component(
+                    config,
+                    load_dropped_students,
+                    preferred_terms=("dropped", "drop", "dropped student", "dropped students"),
+                    default={},
+                )
 
             # Load attendance from its own separate file.
             df, hours_col, sched_col = load_attendance(attendance)
@@ -395,12 +402,12 @@ class App(Tk):
             self.run_btn.config(text="Resolving schedules…")
             self.update_idletasks()
 
-            schedules = self._resolve_schedules(df, hours_col, sched_col)
+            schedules = self._resolve_schedules(df, hours_col, sched_col, dropped_students, hold_periods)
 
             self.run_btn.config(text="Analyzing…")
             threading.Thread(
                 target=self._phase2_analyze,
-                args=(df, hours_col, schedules, changes, hold_periods, new_students),
+                args=(df, hours_col, schedules, changes, hold_periods, new_students, dropped_students),
                 daemon=True,
             ).start()
 
@@ -408,7 +415,7 @@ class App(Tk):
             self.run_btn.config(state=NORMAL, text="Run Analysis")
             messagebox.showerror("Error", traceback.format_exc())
 
-    def _resolve_schedules(self, df, hours_col, sched_col) -> dict:
+    def _resolve_schedules(self, df, hours_col, sched_col, dropped_students=None, hold_periods=None) -> dict:
         # Capture the reduced set once here so every infer_schedule call
         # uses the same set that was loaded moments ago, with no reliance
         # on the module global being read at the right moment.
@@ -417,6 +424,15 @@ class App(Tk):
         self._skipped_students = []   # students whose schedule couldn't be resolved
 
         for student in sorted(df["_student"].unique()):
+            # Skip dropped students to avoid schedule-conflict popups.
+            # On-hold wins: if on-hold, do NOT skip here (hold logic handles it in analyze).
+            student_has_holds = any(h["student"] == student for h in (hold_periods or []))
+            if dropped_students and student in dropped_students and not student_has_holds:
+                if dropped_students[student] < date.today():
+                    self._skipped_students.append(student)
+                    schedules[student] = {"schedule": [], "hrs_per_session": 1.0}
+                    continue
+
             sdf  = df[df["_student"] == student]
             info = infer_schedule(student, sdf, hours_col, sched_col,
                                   reduced_set=reduced_set,
@@ -451,13 +467,14 @@ class App(Tk):
             }
         return schedules
 
-    def _phase2_analyze(self, df, hours_col, schedules, changes, hold_periods, new_students):
+    def _phase2_analyze(self, df, hours_col, schedules, changes, hold_periods, new_students, dropped_students):
         try:
             results, skipped = analyze(
                 df, hours_col, schedules,
                 schedule_changes=changes,
                 hold_periods=hold_periods,
                 new_students=new_students,
+                dropped_students=dropped_students,
             )
             self.after(0, self._populate_table, results, skipped)
         except Exception:

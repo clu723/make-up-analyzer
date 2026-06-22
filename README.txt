@@ -74,8 +74,8 @@ The window has three file pickers:
           +------------+-----------+----------------+------------------+
           | First Name | Last Name | Effective Date | New Session Days |
           +------------+-----------+----------------+------------------+
-          | Jane       | Doe       | 2026-04-15     | Mon, Wed         |
-          | John       | Smith     | 2026-03-10     | Tue, Thu         |
+          | Jane       | Doe       | 04/15/2026     | Mon, Wed         |
+          | John       | Smith     | 03/10/2026     | Tue, Thu         |
           +------------+-----------+----------------+------------------+
 
           OR if you prefer a single name column:
@@ -83,12 +83,12 @@ The window has three file pickers:
           +------------+----------------+------------------+
           | Full Name  | Effective Date | New Session Days |
           +------------+----------------+------------------+
-          | Jane Doe   | 2026-04-15     | Mon, Wed         |
-          | John Smith | 2026-03-10     | Tue, Thu         |
+          | Jane Doe   | 04/15/2026     | Mon, Wed         |
+          | John Smith | 03/10/2026     | Tue, Thu         |
           +------------+----------------+------------------+
 
         EFFECTIVE DATE — the first day the new schedule applies.
-          Any date format Excel recognises works (2026-04-15, 4/15/2026, etc.)
+          Any date format Excel recognises works (04/15/2026, 4/15/2026, etc.)
 
         NEW SESSION DAYS — the days of the week after the change.
           Separate multiple days with a comma. Accepted abbreviations:
@@ -123,7 +123,7 @@ The window has three file pickers:
           +------------+-----------+----------------+-------------+
           | First Name | Last Name | Hold Start     | Hold End    |
           +------------+-----------+----------------+-------------+
-          | Jane       | Doe       | 2026-04-15     | 2026-05-10  |
+          | Jane       | Doe       | 04/15/2026     | 05/10/2026  |
           +------------+-----------+----------------+-------------+
 
           OR single name column:
@@ -131,14 +131,41 @@ The window has three file pickers:
           +------------+----------------+-------------+
           | Full Name  | Hold Start     | Hold End    |
           +------------+----------------+-------------+
-          | Jane Doe   | 2026-04-15     | 2026-05-10  |
+          | Jane Doe   | 04/15/2026     | 05/10/2026  |
           +------------+----------------+-------------+
 
         HOLD START — the first day the hold begins (inclusive).
         HOLD END   — the first day the student returns (exclusive).
                      Leave blank for indefinite hold.
 
-     d) New Students tab   <- OPTIONAL
+     d) Dropped Students tab   <- OPTIONAL
+        Records students who have stopped attending. They are completely
+        excluded from the make-up report and schedule-conflict popups once
+        their Last Attendance Date has passed.
+
+        If a student is on BOTH the Dropped and On-Hold lists, on-hold wins
+        and the student is treated as on-hold, not dropped.
+
+        Columns:
+
+          +------------+-----------+----------------------+
+          | First Name | Last Name | Last Attendance Date |
+          +------------+-----------+----------------------+
+          | Jane       | Doe       | 04/15/2026           |
+          +------------+-----------+----------------------+
+
+          OR single name column:
+
+          +------------+----------------------+
+          | Full Name  | Last Attendance Date |
+          +------------+----------------------+
+          | Jane Doe   | 04/15/2026           |
+          +------------+----------------------+
+
+        LAST ATTENDANCE DATE — the last date the student attended.
+          Once this date is in the past, the student is excluded entirely.
+
+     e) New Students tab   <- OPTIONAL
         Records students who recently started and have a start date.
         They do not owe makeup hours for sessions that occurred before
         their start date. Months entirely before the start date are
@@ -150,7 +177,7 @@ The window has three file pickers:
           +------------+-----------+----------------+
           | First Name | Last Name | Start Date     |
           +------------+-----------+----------------+
-          | Jane       | Doe       | 2026-05-15     |
+          | Jane       | Doe       | 05/15/2026     |
           +------------+-----------+----------------+
 
           OR single name column:
@@ -158,7 +185,7 @@ The window has three file pickers:
           +------------+----------------+
           | Full Name  | Start Date     |
           +------------+----------------+
-          | Jane Doe   | 2026-05-15     |
+          | Jane Doe   | 05/15/2026     |
           +------------+----------------+
 
 Then click Run Analysis.

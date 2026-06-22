@@ -527,6 +527,51 @@ def load_new_students(filepath: str, sheet_name=0) -> dict:
     return results
 
 
+def load_dropped_students(filepath: str, sheet_name=0) -> dict:
+    """
+    Load dropped students with their last attendance date from Excel.
+    Required columns:
+      - Name: "First Name" + "Last Name"  OR  "Full Name" / "Name"
+      - "Last Attendance Date" (any date-parseable format)
+    Returns: {student_name: last_attendance_date}
+    Students on this list are completely excluded from results and schedule
+    popups once their Last Attendance Date has passed.
+    If a student is on BOTH the Dropped and On-Hold lists, on-hold wins.
+    """
+    df = pd.read_excel(filepath, sheet_name=sheet_name)
+    df.columns = [str(c).strip() for c in df.columns]
+
+    first_col = find_col(df.columns, "first name", "first")
+    last_col  = find_col(df.columns, "last name",  "last")
+    name_col  = find_col(df.columns, "full name",  "name")
+    date_col  = find_col(df.columns, "last attendance date", "last date", "drop date", "date")
+
+    if not date_col:
+        raise ValueError("Dropped Students sheet must have a 'Last Attendance Date' column.")
+
+    results = {}
+    for _, row in df.iterrows():
+        if first_col and last_col:
+            f, l = str(row[first_col]).strip(), str(row[last_col]).strip()
+            if f in ("", "nan") or l in ("", "nan"):
+                continue
+            name = f"{f} {l}"
+        elif name_col:
+            name = str(row[name_col]).strip()
+            if not name or name == "nan":
+                continue
+        else:
+            continue
+
+        try:
+            last_date = pd.to_datetime(row[date_col]).date()
+        except Exception:
+            continue
+
+        results[name] = last_date
+    return results
+
+
 def hold_active_for_month(student: str, yr: int, mo: int, hold_periods: list):
     """Return (is_on_hold, start_date, end_date) if any hold overlaps month.
     end_date of None means the hold is indefinite."""
@@ -614,12 +659,16 @@ def analyze(df, hours_col: str, schedules: dict,
             schedule_changes: list = None,
             hold_periods: list = None,
             new_students: dict = None,
+            dropped_students: dict = None,
             reference_date: date = None):
     """
     schedules        : { student: {"schedule": [int,...], "hrs_per_session": float} }
     schedule_changes : [ {"student": str, "effective_date": date, "schedule": [int,...]} ]
     hold_periods     : [ {"student": str, "start_date": date, "end_date": date}, ... ]
     new_students     : { student_name: start_date } — months before start_date are skipped
+    dropped_students : { student_name: last_attendance_date } — students excluded
+                       entirely once their last attendance date has passed;
+                       on-hold takes precedence over dropped
     Returns (results, skipped) where:
       results : list of result dicts
       skipped : { student_name: reason_string } for students in the attendance
@@ -633,6 +682,8 @@ def analyze(df, hours_col: str, schedules: dict,
         hold_periods = []
     if new_students is None:
         new_students = {}
+    if dropped_students is None:
+        dropped_students = {}
 
     win_start, window_end = grace_window(reference_date)
     cur_y, cur_m = reference_date.year, reference_date.month
@@ -650,6 +701,15 @@ def analyze(df, hours_col: str, schedules: dict,
     skipped     = {}   # { student: reason } for students producing no results
 
     for student in sorted(df["_student"].unique()):
+        # Dropped students: complete exclusion when last_attendance_date < reference_date.
+        # On-hold wins: if student has any hold period, treat as on-hold, not dropped.
+        # Must be checked BEFORE base_sched emptiness — dropped students have empty
+        # schedules on purpose and should not trigger a "schedule not determined" warning.
+        student_has_holds = any(h["student"] == student for h in hold_periods)
+        if student in dropped_students and not student_has_holds:
+            if dropped_students[student] < reference_date:
+                continue
+
         s_info      = schedules.get(student, {})
         base_sched  = s_info.get("schedule", [])
         hrs_per_ses = s_info.get("hrs_per_session", 1.0)
