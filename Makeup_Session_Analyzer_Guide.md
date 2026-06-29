@@ -6,7 +6,7 @@
 
 ## Quick Start
 
-**Double-click** `MakeupAnalyzer.exe` (Windows) or `MakeupAnalyzer` (Mac).
+**Double-click** `MakeupAnalyzer.exe` (Windows).
 
 The window has **two file pickers**:
 
@@ -15,6 +15,13 @@ The window has **two file pickers**:
 ### 1. Attendance sheet (`.xlsx`) — *Required*
 
 Your normal monthly attendance export from Radius.
+**Make sure to set the start date to the first day of the month that is 2 months prior to the current month.**
+
+**Example:**
+
+- The current date is June 11
+- Select the date range of the attendance sheet to be from **4/1** to **6/11**
+- Click "Export to Excel"
 
 ---
 
@@ -64,8 +71,6 @@ Any date format works: `04/15/2026`, `4/15/2026`, `April 15, 2026`.
 
 Accepted days: `Mon` `Tue` `Wed` `Thu` `Fri` `Sat`
 
-> ⚠️ Sunday is **not** accepted. Session days are Monday through Saturday only.
-
 Leave this tab out if no students changed their schedule.
 
 ---
@@ -74,22 +79,21 @@ Leave this tab out if no students changed their schedule.
 
 Records students who are temporarily on hold (sick leave, vacation, suspension, etc.).
 
-| First Name | Last Name | Hold Start | Hold End   |
-|------------|-----------|------------|------------|
-| Jane       | Doe       | 04/15/2026 | 05/10/2026 |
+| First Name | Last Name | Hold Start |
+|------------|-----------|------------|
+| Jane       | Doe       | 04/15/2026 |
 
 *Or with a single name column:*
 
-| Full Name   | Hold Start | Hold End   |
-|-------------|------------|------------|
-| Jane Doe    | 04/15/2026 | 05/10/2026 |
+| Full Name   | Hold Start |
+|-------------|------------|
+| Jane Doe    | 04/15/2026 |
 
 **Hold Start** — The first day the hold begins (inclusive).
 
-**Hold End** — The **first day the student returns** (exclusive).  
-Example: `Hold Start = Apr 15` and `Hold End = May 10` means the student is on hold **Apr 15 through May 9**, and back on **May 10**.
-
-Leave **Hold End** blank for an indefinite hold.
+The hold **automatically ends** on the first attendance date on or after the
+hold start date — no end date column is needed. If no attendance is recorded
+after the start date, the hold remains indefinite (still on hold).
 
 ---
 
@@ -147,15 +151,6 @@ Click **Run Analysis**.
 ---
 
 ## Reading the Results
-
-Results appear in the table with color-coded rows:
-
-| Color  | Meaning                                                        |
-|--------|----------------------------------------------------------------|
-| 🔴 Red   | Student still needs makeup hours                                |
-| 🟡 Yellow | Student is **at risk** — one missed session away from needing makeup |
-| 🔵 Blue  | Student is currently **on hold**                                |
-| 🟢 Green | Shortfall has been **fully made up**                            |
 
 > Click any row to see full details at the bottom of the window.
 
@@ -365,10 +360,10 @@ The analyzer follows this process for each student:
 4. Count **attendance on non-scheduled days** as makeup hours
 5. **Apply makeup hours** to shortages from the same month
 6. Determine whether the student:
-   - Still needs makeup hours → 🔴
-   - Is at risk of needing makeup hours → 🟡
-   - Has fully satisfied the requirement → 🟢
-   - Is currently on hold → 🔵
+   - Still needs makeup hours
+   - Is at risk of needing makeup hours
+   - Has fully satisfied the requirement
+   - Is currently on hold
 
 ---
 
@@ -399,15 +394,3 @@ When a student comes in for a makeup session, here's how to record it:
 
 ---
 
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| "No students need makeups" but you expected results | Check the **grace period** — shortages older than 2 months are automatically dropped. |
-| Student's schedule shows wrong days | Run the analysis again and complete the **schedule resolution dialog** when it appears. |
-| New student shown as needing makeups before they started | Add the student to the **New Students** tab with their start date. |
-| Student on hold still shows as needing makeups | This is expected — their status will show "On Hold" but the hours are tracked for reference. |
-
----
-
-> **Questions?** Contact the administrator who set up this tool.

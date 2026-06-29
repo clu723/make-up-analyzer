@@ -51,6 +51,7 @@ from analyzer_core import (
     DAY_FULL,
     load_reduced_students, load_schedule_changes, load_attendance,
     load_hold_students, load_new_students, load_dropped_students,
+    resolve_hold_end_dates,
     infer_schedule, analyze, export_excel,
 )
 
@@ -399,6 +400,11 @@ class App(Tk):
             # Load attendance from its own separate file.
             df, hours_col, sched_col = load_attendance(attendance)
 
+            # Auto-resolve hold end dates from attendance data:
+            # the hold ends on the first attendance date >= hold start date.
+            if hold_periods:
+                hold_periods = resolve_hold_end_dates(hold_periods, df)
+
             self.run_btn.config(text="Resolving schedules…")
             self.update_idletasks()
 
@@ -458,8 +464,11 @@ class App(Tk):
             final_schedule = info.get("schedule") or []
             if not final_schedule:
                 # Schedule is empty — student will be excluded from analysis.
-                # Record them so the UI can warn the user.
-                self._skipped_students.append(student)
+                # On-hold students are silently skipped (their hold status is known);
+                # other students get a warning so the user can investigate.
+                student_has_holds = any(h["student"] == student for h in (hold_periods or []))
+                if not student_has_holds:
+                    self._skipped_students.append(student)
 
             schedules[student] = {
                 "schedule":        final_schedule,

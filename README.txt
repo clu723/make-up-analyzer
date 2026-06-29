@@ -109,9 +109,13 @@ The window has three file pickers:
         hours are prorated — only scheduled sessions outside the hold
         period count toward the monthly minimum.
 
-        End date is the FIRST DAY the student is back (exclusive).
-        Example: hold from April 15 to May 10 means the student is on
-        hold April 15 through May 9, and back on May 10.
+        The hold automatically ends on the first attendance date on or
+        after the hold start date — no end date column is needed.
+        Example: hold starts April 15, student attends April 22 →
+        hold spans April 15 through April 21.
+
+        If no attendance is recorded after the hold start, the hold is
+        indefinite (still on hold).
 
         If a student is currently on hold (hold overlaps the current
         month), any past-month shortfalls are shown with status "On Hold"
@@ -120,23 +124,21 @@ The window has three file pickers:
 
         Columns:
 
-          +------------+-----------+----------------+-------------+
-          | First Name | Last Name | Hold Start     | Hold End    |
-          +------------+-----------+----------------+-------------+
-          | Jane       | Doe       | 04/15/2026     | 05/10/2026  |
-          +------------+-----------+----------------+-------------+
+          +------------+-----------+------------+
+          | First Name | Last Name | Hold Start |
+          +------------+-----------+------------+
+          | Jane       | Doe       | 04/15/2026 |
+          +------------+-----------+------------+
 
           OR single name column:
 
-          +------------+----------------+-------------+
-          | Full Name  | Hold Start     | Hold End    |
-          +------------+----------------+-------------+
-          | Jane Doe   | 04/15/2026     | 05/10/2026  |
-          +------------+----------------+-------------+
+          +------------+------------+
+          | Full Name  | Hold Start |
+          +------------+------------+
+          | Jane Doe   | 04/15/2026 |
+          +------------+------------+
 
         HOLD START — the first day the hold begins (inclusive).
-        HOLD END   — the first day the student returns (exclusive).
-                     Leave blank for indefinite hold.
 
      d) Dropped Students tab   <- OPTIONAL
         Records students who have stopped attending. They are completely

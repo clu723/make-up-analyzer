@@ -418,8 +418,9 @@ def load_hold_students(filepath: str, sheet_name=0) -> list:
     Accepted columns:
       - Name: "First Name" + "Last Name"  OR  "Full Name" / "Name"
       - Start date: "Effective Date", "Start Date", "Hold Start Date", etc.
-      - End date:   "End Date", "Hold End Date", etc.
-    Returns: [{"student": str, "start_date": date, "end_date": date}, ...]
+    Returns: [{"student": str, "start_date": date, "end_date": None}, ...]
+    End dates are NOT read from the sheet — they are auto-resolved from
+    attendance data by resolve_hold_end_dates().
     """
     df = pd.read_excel(filepath, sheet_name=sheet_name)
     df.columns = [str(c).strip() for c in df.columns]
@@ -432,17 +433,12 @@ def load_hold_students(filepath: str, sheet_name=0) -> list:
         df.columns,
         "effective date", "start date", "hold start", "begin date", "begin"
     )
-    end_col = find_col(
-        df.columns,
-        "end date", "hold end", "end", "through", "until"
-    )
 
     if not start_col:
         raise ValueError(
             "On-hold sheet must have a start date column "
             "(for example 'Effective Date' or 'Start Date')."
         )
-    # end_col is optional — a blank or missing end date means indefinite hold.
 
     results = []
     for _, row in df.iterrows():
@@ -463,25 +459,53 @@ def load_hold_students(filepath: str, sheet_name=0) -> list:
         except Exception:
             continue
 
-        # Parse end date — blank/missing means indefinite (None).
-        end_date = None
-        if end_col:
-            try:
-                raw_end = row[end_col]
-                if pd.notna(raw_end) and str(raw_end).strip() not in ("", "nan"):
-                    end_date = pd.to_datetime(raw_end).date()
-            except Exception:
-                pass   # treat unparseable end date as indefinite
-
-        if end_date is not None and end_date < start_date:
-            continue   # skip invalid rows where end is before start
-
         results.append({
             "student":    name,
             "start_date": start_date,
-            "end_date":   end_date,   # None = indefinite
+            "end_date":   None,   # resolved later from attendance
         })
     return results
+
+
+def resolve_hold_end_dates(hold_periods: list, attendance_df) -> list:
+    """
+    Auto-resolve hold end dates from attendance data.
+
+    For each hold, the end date is set to the earliest attendance date
+    on or after the hold start date.  If no attendance exists after the
+    start date, the hold remains indefinite (end_date = None).
+
+    A hold spans [start_date, end_date) — the student is on hold from
+    start_date through the day BEFORE end_date, and back on end_date.
+    The first attendance date after the hold started acts as the implicit
+    "first day back" (end_date).
+    """
+    if not hold_periods:
+        return hold_periods
+
+    # Per-student attendance dates, sorted.
+    student_dates = {}
+    for _, row in attendance_df.iterrows():
+        name = row.get("_student", "")
+        d    = row.get("_date")
+        if name and d is not None:
+            student_dates.setdefault(name, []).append(d)
+
+    for name in student_dates:
+        student_dates[name].sort()
+
+    for h in hold_periods:
+        name   = h["student"]
+        start  = h["start_date"]
+        dates  = student_dates.get(name, [])
+        # Find the first attendance on or after the hold start.
+        for d in dates:
+            if d >= start:
+                h["end_date"] = d
+                break
+        # If no attendance found, end_date stays None (indefinite hold).
+
+    return hold_periods
 
 
 def load_new_students(filepath: str, sheet_name=0) -> dict:
@@ -574,6 +598,13 @@ def load_dropped_students(filepath: str, sheet_name=0) -> dict:
 
 def hold_active_for_month(student: str, yr: int, mo: int, hold_periods: list):
     """Return (is_on_hold, start_date, end_date) if any hold overlaps month.
+
+    A student is considered "on hold" only when the hold covers the entire
+    month (end_date is beyond month_end or indefinite).  When a hold ends
+    during the month (return month), the student is NOT on hold — they get
+    normal status — but start_date/end_date are still returned so prorated
+    requirement can be calculated from the return date onward.
+
     end_date of None means the hold is indefinite."""
     if not hold_periods:
         return False, None, None
@@ -593,7 +624,14 @@ def hold_active_for_month(student: str, yr: int, mo: int, hold_periods: list):
     # If any overlapping hold has no end date, the combined hold is indefinite.
     ends = [h["end_date"] for h in overlaps]
     end  = None if any(e is None for e in ends) else max(ends)
-    return True, start, end
+
+    # Student is "on hold" only if the hold extends past this month
+    # (end_date is beyond month_end) or is indefinite (end_date is None).
+    # In the return month (end_date falls within the month), the student
+    # gets normal status but proration still applies.
+    is_on_hold = (end is None or end > month_end)
+
+    return is_on_hold, start, end
 
 def compute_prorated_requirement(student: str, yr: int, mo: int,
                                   base_schedule: list, changes: list,
@@ -714,11 +752,15 @@ def analyze(df, hours_col: str, schedules: dict,
         base_sched  = s_info.get("schedule", [])
         hrs_per_ses = s_info.get("hrs_per_session", 1.0)
         if not base_sched:
-            skipped[student] = (
-                "Schedule could not be determined. "
-                "The dialog may have been closed without confirming, "
-                "or no attendance history was found."
-            )
+            # On-hold students with no schedule are silently skipped;
+            # their hold status is known and doesn't need a warning.
+            student_has_holds = any(h["student"] == student for h in hold_periods)
+            if not student_has_holds:
+                skipped[student] = (
+                    "Schedule could not be determined. "
+                    "The dialog may have been closed without confirming, "
+                    "or no attendance history was found."
+                )
             continue
 
         sdf             = df[df["_student"] == student].copy()
@@ -806,7 +848,11 @@ def analyze(df, hours_col: str, schedules: dict,
                 student, yr, mo, hold_periods
             )
 
-            if on_hold:
+            # Prorated requirement applies whenever a hold covers any part
+            # of the month (start_date returned), not just when on_hold.
+            # In the return month the student is not "on hold" but still
+            # only owes hours for sessions after their return date.
+            if hold_start is not None:
                 req = compute_prorated_requirement(
                     student, yr, mo, base_sched, schedule_changes,
                     hrs_per_ses, hold_periods
@@ -839,6 +885,10 @@ def analyze(df, hours_col: str, schedules: dict,
                 if past_sched and add_months(max(past_sched), 2) < reference_date:
                     continue
 
+            # In the return month (hold ends during the month), the student
+            # is not on_hold but we still don't skip zero-shortage rows for
+            # past months if their return hadn't happened yet — only skip
+            # when there truly is no hold overlap and no shortage.
             if shortage <= 0 and not on_hold and not is_current:
                 continue
 
@@ -890,10 +940,21 @@ def analyze(df, hours_col: str, schedules: dict,
             # A student can still be at risk even if they are fully made up
             # today, because one missed future session would drop them below
             # the required total.
+            #
+            # IMPORTANT: use makeup_credit (not applied) because applied is
+            # capped at shortage.  A student with 0 shortage but 1 hr of
+            # banked makeup credit can absorb a missed session and is NOT
+            # at risk — applied would be 0 and wrongly flag them.
             if sf["is_current"]:
-                projected_after_makeups = sf["display_proj"] + applied
+                # Store the current month's variables in the shortfall so
+                # the check below uses the right future_sched / req even if
+                # months_in_scope ordering changes in the future.
+                sf["_future_sched"] = future_sched
+                sf["_req"]          = req
+                projected_after_makeups = sf["display_proj"] + makeup_credit
                 sf["at_risk"] = (
                     len(future_sched) > 0
+                    and sf["remaining"] <= 0
                     and (projected_after_makeups - hrs_per_ses) < req
                 )
             else:
