@@ -49,6 +49,26 @@ Leave this tab out if all students use the 8-hour standard.
 
 ---
 
+#### Tab: Extra-Hours Students
+
+Students who require **12 hours/month** instead of the standard 8.
+
+| First Name | Last Name |
+|------------|-----------|
+| Jane       | Doe       |
+| John       | Smith     |
+
+*Or a single column:*
+
+| Full Name   |
+|-------------|
+| Jane Doe    |
+| John Smith  |
+
+Leave this tab out if all students use the 8-hour standard.
+
+---
+
 #### Tab: Schedule Changes
 
 Records students who **permanently switched** their session days partway through a month.
@@ -196,6 +216,8 @@ Exported columns:
 Most students need **8 hours per month**.
 
 Students on the **Reduced-Hour Students** list need **4 hours per month**.
+
+Students on the **Extra-Hours Students** list need **12 hours per month**.
 
 ### 2. Regular Hours
 

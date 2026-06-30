@@ -23,12 +23,18 @@ import pandas as pd
 # Config  (mutated at runtime by callers)
 # ---------------------------------------------------------------------------
 REDUCED_REQUIREMENT: set = set()
+EXTRA_REQUIREMENT:   set = set()
 DEFAULT_REQUIRED_HRS = 8
 REDUCED_REQUIRED_HRS = 4
+EXTRA_REQUIRED_HRS   = 12
 
 
 def required_hrs(student: str) -> int:
-    return REDUCED_REQUIRED_HRS if student in REDUCED_REQUIREMENT else DEFAULT_REQUIRED_HRS
+    if student in REDUCED_REQUIREMENT:
+        return REDUCED_REQUIRED_HRS
+    if student in EXTRA_REQUIREMENT:
+        return EXTRA_REQUIRED_HRS
+    return DEFAULT_REQUIRED_HRS
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +166,7 @@ def _ok(schedule, hrs):
 
 def infer_schedule(student: str, sdf, hours_col: str, sched_col,
                    reduced_set: set = None,
+                   extra_set: set = None,
                    reference_date: date = None) -> dict:
     """
     Infer a student's regular schedule from their full attendance history.
@@ -167,16 +174,23 @@ def infer_schedule(student: str, sdf, hours_col: str, sched_col,
 
     reduced_set    : set of reduced-hours student names — pass explicitly so
                      the caller controls which set is used at inference time.
+    extra_set      : set of extra-hours student names (12 hrs/month).
     reference_date : used to restrict hrs_per_session estimation to prior months,
                      since the current month may have irregular makeup sessions.
     """
     if reduced_set is None:
         reduced_set = REDUCED_REQUIREMENT
+    if extra_set is None:
+        extra_set = EXTRA_REQUIREMENT
     if reference_date is None:
         reference_date = date.today()
 
     def _req():
-        return REDUCED_REQUIRED_HRS if student in reduced_set else DEFAULT_REQUIRED_HRS
+        if student in reduced_set:
+            return REDUCED_REQUIRED_HRS
+        if student in extra_set:
+            return EXTRA_REQUIRED_HRS
+        return DEFAULT_REQUIRED_HRS
 
     # 1. Explicit schedule column takes priority — cell values only.
     # The column-header fallback ("Session days: Tu, Thu" in the name) is
@@ -498,12 +512,15 @@ def resolve_hold_end_dates(hold_periods: list, attendance_df) -> list:
         name   = h["student"]
         start  = h["start_date"]
         dates  = student_dates.get(name, [])
-        # Find the first attendance on or after the hold start.
+        # Find the first attendance at least 2 weeks after the hold start.
+        # Shorter gaps (a few days) are not valid hold-end signals.
+        two_weeks_out = start + timedelta(days=14)
         for d in dates:
-            if d >= start:
+            if d >= two_weeks_out:
                 h["end_date"] = d
                 break
-        # If no attendance found, end_date stays None (indefinite hold).
+        # If no attendance found >= 2 weeks out, end_date stays None
+        # (indefinite hold or still on hold).
 
     return hold_periods
 
@@ -995,10 +1012,10 @@ def analyze(df, hours_col: str, schedules: dict,
             # Use the actual hold dates for the current hold when
             # overriding a past-month row.
             display_on_hold = effective_on_hold
-            display_hold_start = (str(cur_hold_start.strftime("%m/%d")) if effective_on_hold and not sf["on_hold"]
-                                    else str(sf["hold_start"]) if sf["hold_start"] else "")
-            display_hold_end   = (str(cur_hold_end.strftime("%m/%d")) if effective_on_hold and not sf["on_hold"] and cur_hold_end
-                                    else (str(sf["hold_end"]) if sf["hold_end"] else
+            display_hold_start = (cur_hold_start.strftime("%m/%d") if effective_on_hold and not sf["on_hold"]
+                                    else sf["hold_start"].strftime("%m/%d") if sf["hold_start"] else "")
+            display_hold_end   = (cur_hold_end.strftime("%m/%d") if effective_on_hold and not sf["on_hold"] and cur_hold_end
+                                    else (sf["hold_end"].strftime("%m/%d") if sf["hold_end"] else
                                           ("Indefinite" if effective_on_hold and not cur_hold_end else "")))
 
             all_results.append({

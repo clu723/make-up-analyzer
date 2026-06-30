@@ -248,7 +248,7 @@ class App(Tk):
                        self.config_path, self._pick_config, row=1)
         Label(picker,
               text=("Configuration workbook is optional. "
-                    "Expected tabs: Reduced-Hour Students, Schedule Changes, On-Hold Students, Dropped Students, New Students."),
+                    "Expected tabs: Reduced-Hour Students, Extra-Hours Students, Schedule Changes, On-Hold Students, Dropped Students, New Students."),
               bg="#f0f0f0", fg="#777", font=("Helvetica", 9)).grid(
               row=2, column=1, sticky=W, pady=(0, 4))
 
@@ -361,6 +361,7 @@ class App(Tk):
             # Load optional configuration tabs from the config workbook.
             # If no config workbook was provided, all defaults are used.
             core.REDUCED_REQUIREMENT = set()
+            core.EXTRA_REQUIREMENT   = set()
             changes      = []
             hold_periods = []
             new_students = {}
@@ -370,6 +371,12 @@ class App(Tk):
                     config,
                     load_reduced_students,
                     preferred_terms=("reduced", "reduced-hours", "reduced hours"),
+                    default=set(),
+                )
+                core.EXTRA_REQUIREMENT = self._load_optional_component(
+                    config,
+                    load_reduced_students,
+                    preferred_terms=("extra", "extra hours", "12 hours", "additional hours", "additional"),
                     default=set(),
                 )
                 changes = self._load_optional_component(
@@ -426,6 +433,7 @@ class App(Tk):
         # uses the same set that was loaded moments ago, with no reliance
         # on the module global being read at the right moment.
         reduced_set = set(core.REDUCED_REQUIREMENT)
+        extra_set   = set(core.EXTRA_REQUIREMENT)
         schedules   = {}
         self._skipped_students = []   # students whose schedule couldn't be resolved
 
@@ -442,6 +450,7 @@ class App(Tk):
             sdf  = df[df["_student"] == student]
             info = infer_schedule(student, sdf, hours_col, sched_col,
                                   reduced_set=reduced_set,
+                                  extra_set=extra_set,
                                   reference_date=date.today())
 
             if info["needs_dialog"]:

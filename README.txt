@@ -63,8 +63,21 @@ The window has three file pickers:
           +------------+-----------+     +------------------+
 
         Leave this out if all students use the standard 8-hour requirement.
-
-     b) Schedule Changes tab   <- OPTIONAL
+        
+              b) Extra-Hours Students tab   <- OPTIONAL
+                 Lists students who need 12 hours/month instead of the standard 8.
+                 Same formats as the Reduced-Hour Students tab.
+        
+                   Format A (two columns):        Format B (one column):
+                   +------------+-----------+     +------------------+
+                   | First Name | Last Name |     | Full Name        |
+                   +------------+-----------+     +------------------+
+                   | Jane       | Doe       |     | Jane Doe         |
+                   +------------+-----------+     +------------------+
+        
+                 Leave this out if all students use the standard 8-hour requirement.
+        
+              c) Schedule Changes tab   <- OPTIONAL
         Records students who permanently switched session days partway
         through a month. The tool uses the old schedule before the
         effective date and the new schedule on and after it.
@@ -208,7 +221,8 @@ need action or are on hold. The exported Excel includes these columns:
 
 HOURS RULES (for reference)
 -----------------------------
-  • Students need 8 hours/month minimum (or 4 hrs for reduced-hours students)
+  • Students need 8 hours/month minimum (or 4 hrs for reduced-hours students,
+    or 12 hrs for extra-hours students)
   • Only sessions on their regular scheduled days count toward the monthly total
   • Attendance on a non-scheduled day = a makeup session for that month
   • A makeup session only counts toward the month it was attended, not a
